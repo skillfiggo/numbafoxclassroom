@@ -1,0 +1,13 @@
+{
+  "name": "jambandwaec-classroom",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.cjs",
+    "check": "node --check server.cjs && node --check classroom-db.cjs && node --check public/learn.js && node --check public/app.js && node --check homework.cjs && node --check tutor-context.cjs",
+    "test": "node --test board.test.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
