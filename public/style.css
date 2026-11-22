@@ -95,11 +95,9 @@ input::placeholder,textarea::placeholder{color:#98a7b8}
 .dock-hint[hidden]{display:none}
 .dock-hint strong{color:#243c5b;font-size:.85rem}
 .dock-hint button{border:0;background:transparent;color:#8797aa;padding:2px;line-height:1}
-.dock-button.active:before{content:attr(title);position:absolute;right:calc(100% + 15px);top:50%;transform:translateY(-50%);white-space:nowrap;background:#233b5a;color:white;border-radius:7px;padding:6px 9px;font-size:.72rem;font-weight:700;box-shadow:0 4px 12px #1831532a;pointer-events:none}
 
 @media(max-width:650px){.dock-hint{right:65px;top:calc(50% - 127px);max-width:180px}
 .community-open .dock{top:calc((100% - min(55vh, 440px)) / 2)}
-.community-open .dock-button.active:before{right:calc(100% + 10px)}
 #community-panel.drawer{top:auto;bottom:0;left:0;right:0;transform:none;width:100%;max-height:min(55vh,440px);border-radius:18px 18px 0 0;padding:16px 20px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -10px 36px #1831532b}
 #community-panel.drawer:before{content:'';display:block;width:36px;height:4px;border-radius:4px;background:#cbd5e2;margin:0 auto 14px}
 #community-panel .drawer-heading{margin-bottom:12px}
@@ -117,7 +115,6 @@ input::placeholder,textarea::placeholder{color:#98a7b8}
 .dock-toggle{display:grid;background:#eaf2ff;color:#2869c4}
 .dock-items{display:none}
 .dock-items.mobile-open{display:flex}
-.dock-items .dock-button.active:before{display:none}
 .community-open .dock{top:calc((100% - min(55vh, 440px)) / 2 + 20px)}
 .dock-hint{right:78px;top:calc(50% + 25px)}
 }
@@ -131,7 +128,6 @@ input::placeholder,textarea::placeholder{color:#98a7b8}
 .dock-toggle[aria-expanded=true] i{transform:rotate(90deg)}
 .close-drawer,.primary,.secondary,.outline{transition:background-color .18s ease,color .18s ease,transform .18s ease}
 .close-drawer:active,.primary:active,.secondary:active,.outline:active{transform:scale(.97)}
-.dock-button.active:before{animation:label-in .22s ease both}
 @keyframes label-in{from{opacity:0;transform:translate(5px,-50%)}
 to{opacity:1;transform:translate(0,-50%)}
 }

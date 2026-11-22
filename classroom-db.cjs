@@ -2,7 +2,6 @@ const url = process.env.SUPABASE_URL?.replace(/\/+$/, '');
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
 const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const configured = Boolean(url && publishableKey && secretKey);
-const teacherIds = new Set((process.env.CLASSROOM_TEACHER_IDS || '').split(',').map(id => id.trim()));
 
 function failure(status, message) {
   return Object.assign(new Error(message), { status, publicMessage: message });
@@ -82,7 +81,8 @@ async function authenticate(req, res, allowRefresh = false) {
   if (!token) throw failure(401, 'Sign in to enter the classroom.');
   const user = await request('/auth/v1/user', { token });
   const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
-  return { token, user, expiresAt: claims.exp * 1000, teacher: teacherIds.has(user.id) };
+  const [membership] = await request('/rest/v1/classroom_roles?select=role&user_id=eq.' + user.id, { privileged: true });
+  return { token, user, expiresAt: claims.exp * 1000, role: membership?.role || null, teacher: ['owner', 'teacher'].includes(membership?.role), owner: membership?.role === 'owner' };
 }
 
 function profileFields(data) {
@@ -110,7 +110,12 @@ async function route(req, res, path, body) {
       });
       profile = await readProfile(account);
     }
-    return { profile, teacher: account.teacher };
+    return { profile, teacher: account.teacher, owner: account.owner };
+  }
+  if (path === '/api/account/teachers' && req.method === 'GET') {
+    const account = await authenticate(req, res, true);
+    if (!account.owner) throw failure(403, 'Owner access required.');
+    return await request('/rest/v1/classroom_roles?select=user_id,role,created_at&order=created_at.asc', { privileged: true });
   }
   if (req.method !== 'POST') throw failure(405, 'Method not allowed.');
   if (path === '/api/account/signout') {
@@ -123,6 +128,15 @@ async function route(req, res, path, body) {
     return { ok: true };
   }
   const data = await body(req);
+  if (path === '/api/account/teachers') {
+    const account = await authenticate(req, res, true);
+    if (!account.owner) throw failure(403, 'Owner access required.');
+    const userId = String(data?.userId || '');
+    const role = data?.role === 'teacher' ? 'teacher' : null;
+    if (!/^[0-9a-f-]{36}$/i.test(userId) || !role) throw failure(400, 'Enter a valid teacher user ID.');
+    await saveRow('classroom_roles', { user_id: userId, role }, { privileged: true });
+    return { ok: true };
+  }
   if (path === '/api/account/resend-confirmation') {
     const email = String(data?.email || '').trim();
     if (!email || email.length > 254) throw failure(400, 'Enter a valid email address.');
