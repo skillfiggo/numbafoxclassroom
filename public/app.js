@@ -107,6 +107,14 @@ function updatePresence(){return api('presence',{id:clientId,name:$('#name').val
 $('#name').addEventListener('change',()=>{try{localStorage.setItem('mathfox-display-name',$('#name').value.trim())}catch{}updatePresence()});
 const joinDialog=$('#join-dialog');let savedName='';try{savedName=localStorage.getItem('mathfox-display-name')||''}catch{}$('#join-form').onsubmit=event=>{event.preventDefault();const name=$('#join-name').value.trim();if(!name)return;$('#name').value=name;try{localStorage.setItem('mathfox-display-name',name)}catch{}joinDialog.close();updatePresence()};$('#test-sound').onclick=()=>{if('speechSynthesis'in window){window.speechSynthesis.cancel();window.speechSynthesis.speak(new SpeechSynthesisUtterance('Welcome to class.'))}};
 function participantInitial(name){return name==='Guest'?'•':Array.from(name.trim())[0]?.toUpperCase()||'•'}
+const leaveClassButton=document.createElement('button');
+leaveClassButton.id='leave-class';leaveClassButton.type='button';leaveClassButton.className='leave-class';leaveClassButton.textContent='Leave class';
+leaveClassButton.onclick=async()=>{
+  leaveClassButton.disabled=true;
+  try{await fetch('/api/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:clientId})})}catch{}
+  events.close();clearInterval(roomSyncTimer);location.assign('/learn');
+};
+document.querySelector('.activity-island')?.append(leaveClassButton);
 function renderPresence(people){const stack=$('#avatar-stack'),list=$('#participants-list');stack.replaceChildren();list.replaceChildren();people.slice(0,4).forEach(person=>{const avatar=el('span',participantInitial(person.name),'avatar');avatar.title=person.name;avatar.setAttribute('aria-label',person.name);stack.append(avatar)});if(people.length>4)stack.append(el('span','+'+(people.length-4),'avatar avatar-more'));$('#presence-count').textContent=people.length===1?'1 here':people.length+' here';$('#participants-summary').textContent=people.length===1?'1 person online':people.length+' people online';if(!people.length)list.append(el('li','No one is connected yet.','participants-empty'));people.forEach(person=>{const item=el('li','','participant');const avatar=el('span',participantInitial(person.name),'participant-avatar');avatar.setAttribute('aria-hidden','true');const details=el('span','','participant-details');details.append(el('strong',person.name+(person.id===clientId?' (you)':'')),el('small','Online'));item.append(avatar,details);list.append(item)})}
 function setParticipantsOpen(open){$('#participants-panel').hidden=!open;$('#participants-toggle').setAttribute('aria-expanded',String(open));$('#participants-toggle').setAttribute('aria-label',open?'Hide online participants':'Show online participants')}
 $('#participants-toggle').onclick=()=>setParticipantsOpen($('#participants-panel').hidden);$('#close-participants').onclick=()=>{setParticipantsOpen(false);$('#participants-toggle').focus()};document.addEventListener('click',event=>{if(!$('#participants-panel').hidden&&!event.target.closest('#participants-panel')&&!event.target.closest('#participants-toggle'))setParticipantsOpen(false)});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#participants-panel').hidden){setParticipantsOpen(false);$('#participants-toggle').focus()}});
@@ -198,6 +206,33 @@ function enableTeacherWorkspace() {
     sharedChat.onclick = () => selectTab('messages');
     heading.append(sharedChat);
   }
+  if (heading && !$('#class-management')) {
+    const actions = document.createElement('div');
+    actions.id = 'class-management';
+    actions.className = 'teacher-class-actions';
+    const clear = document.createElement('button');
+    clear.type = 'button'; clear.className = 'outline'; clear.textContent = 'Clear board';
+    clear.onclick = async () => {
+      if (!confirm('Clear the live board? The current working will remain in Recap.')) return;
+      try {
+        const result = await api('class/clear', {}, true);
+        await applyRoomSnapshot(result.room);
+        $('#teacher-note').textContent = 'Board cleared. The previous working is in Recap.';
+      } catch (error) { $('#teacher-note').textContent = error.message; }
+    };
+    const end = document.createElement('button');
+    end.type = 'button'; end.className = 'secondary'; end.textContent = 'End class';
+    end.onclick = async () => {
+      if (!confirm('End this class for everyone? Students will be able to review the recap.')) return;
+      try {
+        const result = await api('class/end', {}, true);
+        await applyRoomSnapshot(result.room);
+        $('#teacher-note').textContent = 'Class ended. The recap is saved for review.';
+      } catch (error) { $('#teacher-note').textContent = error.message; }
+    };
+    actions.append(clear, end);
+    heading.append(actions);
+  }
   const aiChat = $('#teacher .teacher-chat');
   if (aiChat && !$('#teacher-ai-feed')) {
     const feed = document.createElement('div');
@@ -256,7 +291,7 @@ function enableTeacherWorkspace() {
 async function refreshRoomSnapshot(){
   try{const response=await fetch('/api/state',{cache:'no-store'});if(response.ok)await applyRoomSnapshot(await response.json())}catch{}
 }
-setInterval(refreshRoomSnapshot, 2500);
+const roomSyncTimer=setInterval(refreshRoomSnapshot, 2500);
 const events=new EventSource('/events?id='+encodeURIComponent(clientId));events.addEventListener('open',()=>{renderPresence([{id:clientId,name:$('#name').value.trim()||'Guest'}]);updatePresence();refreshRoomSnapshot()});events.addEventListener('presence',e=>renderPresence(JSON.parse(e.data)));events.addEventListener('message',e=>showMessage(JSON.parse(e.data)));events.addEventListener('reaction',e=>{const item=el('span',JSON.parse(e.data).symbol,'reaction-float');$('#reaction-popups').append(item);setTimeout(()=>item.remove(),2200)});events.addEventListener('replay',()=>{if(state?.explanation)playNarration(state.explanation)});events.addEventListener('voice-listener',e=>addListener(JSON.parse(e.data).id).catch(()=>{$('#microphone-status').textContent='A listener could not connect.'}));events.addEventListener('voice-signal',e=>receiveSignal(JSON.parse(e.data)).catch(()=>{$('#voice-label').textContent='Audio connection failed'}));events.addEventListener('voice-ended',()=>{resetVoicePeers();if(!microphoneStream)setSpeaking(false)});events.addEventListener('state',e=>{const next=JSON.parse(e.data),prior=state;state=next;render();saveVisit(next);if(!prior)lastNarratedStep=next.lesson?.step||0;else if(next.lesson?.step>lastNarratedStep){lastNarratedStep=next.lesson.step;if(!next.lesson.paused&&next.lesson.speaker==='ai'&&!next.voice.active)playNarration(state.explanation)}else if(next.lesson?.step===0){lastNarratedStep=0;if(prior?.lesson?.step>0&&'speechSynthesis'in window){window.speechSynthesis.cancel();setSpeaking(false)}}if(next.lesson?.paused&&!prior?.lesson?.paused&&'speechSynthesis'in window){window.speechSynthesis.cancel();setSpeaking(false)}if(next.voice?.active&&!prior?.voice?.active){if('speechSynthesis'in window)window.speechSynthesis.cancel();requestTeacherAudio()}if(!next.voice?.active&&prior?.voice?.active){resetVoicePeers();if(!microphoneStream)setSpeaking(false)}});events.onerror=()=>{$('#status').textContent='● Reconnecting…';setSpeaking(false);setTimeout(refreshRoomSnapshot,1000)};
 
 }

@@ -70,11 +70,27 @@ export default {
         body: JSON.stringify({ type: 'ai', update: result.update })
       }));
     }
+    if (request.method === 'POST' && (url.pathname === '/api/class/clear' || url.pathname === '/api/class/end')) {
+      const current = await accountFromCookies(request, env).catch(() => null);
+      if (!current) return Response.json({ error: 'Sign in to manage this class.' }, { status: 401 });
+      if (!current.account.teacher) return Response.json({ error: 'Only teachers can manage this class.' }, { status: 403 });
+      const type = url.pathname.endsWith('/clear') ? 'clear' : 'end';
+      return publicRoom.fetch(new Request(new URL('/state', request.url), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Classroom-User': current.account.user.id, 'X-Classroom-Teacher': 'true' },
+        body: JSON.stringify({ type })
+      }));
+    }
     if (request.method === 'POST' && url.pathname === '/api/presence') {
       return publicRoom.fetch(new Request(new URL('/presence', request.url), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: request.body
+      }));
+    }
+    if (request.method === 'POST' && url.pathname === '/api/leave') {
+      return publicRoom.fetch(new Request(new URL('/leave', request.url), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: request.body
       }));
     }
     if (request.method === 'POST' && (url.pathname === '/api/message' || url.pathname === '/api/question')) {

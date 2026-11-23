@@ -10,6 +10,14 @@ const emptyRoom = () => ({
   voice: { active: false, teacherId: null }
 });
 
+function checkpoint(room, label) {
+  if (!room.board?.rows?.length && !room.working && !room.explanation) return room.recap || [];
+  return [...(room.recap || []), {
+    id: crypto.randomUUID(), label, at: Date.now(), board: room.board,
+    working: room.working || '', explanation: room.explanation || ''
+  }].slice(-40);
+}
+
 export class ClassroomRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -24,6 +32,7 @@ export class ClassroomRoom extends DurableObject {
     const url = new URL(request.url);
     if (url.pathname.endsWith('/events')) return this.events(request);
     if (url.pathname.endsWith('/presence') && request.method === 'POST') return this.presence(request);
+    if (url.pathname.endsWith('/leave') && request.method === 'POST') return this.leave(request);
     if (url.pathname.endsWith('/connect')) return this.connect(request);
     if (request.method === 'GET') return Response.json(this.publicRoom());
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -69,6 +78,17 @@ export class ClassroomRoom extends DurableObject {
     return Response.json({ ok: true });
   }
 
+  async leave(request) {
+    const { id } = await request.json();
+    const client = this.eventStreams.get(String(id || ''));
+    if (client) {
+      this.eventStreams.delete(client.id);
+      client.writer.close().catch(() => {});
+      this.publishPresence();
+    }
+    return Response.json({ ok: true });
+  }
+
   async connect(request) {
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('WebSocket required', { status: 426 });
     const pair = new WebSocketPair();
@@ -108,6 +128,25 @@ export class ClassroomRoom extends DurableObject {
         working: event.update.working,
         explanation: event.update.explanation,
         lesson: { ...this.room.lesson, step: (this.room.lesson?.step || 0) + 1, speaker: 'ai' }
+      };
+    }
+    if (event.type === 'clear') {
+      if (!actor.teacher) throw new Error('Only teachers can clear the board.');
+      this.room = {
+        ...this.room,
+        recap: checkpoint(this.room, 'Board cleared'),
+        board: { title: 'The Board', layout: 'working', rows: [], angles: [] },
+        working: '', explanation: 'The board has been cleared. Your previous working is saved in Recap.'
+      };
+    }
+    if (event.type === 'end') {
+      if (!actor.teacher) throw new Error('Only teachers can end a class.');
+      this.room = {
+        ...this.room,
+        recap: checkpoint(this.room, 'Class ended'),
+        status: 'ended',
+        lesson: { ...this.room.lesson, paused: true },
+        voice: { active: false, teacherId: null }
       };
     }
     if (event.type === 'message' && event.message) this.room.messages = [...this.room.messages, event.message].slice(-100);
