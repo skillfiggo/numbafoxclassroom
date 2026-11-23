@@ -39,7 +39,7 @@ async function body(request) {
   try { return await request.json(); } catch { return null; }
 }
 
-async function accountFromCookies(request, env) {
+export async function accountFromCookies(request, env) {
   let token = cookie(request, 'classroom_access');
   let session = null;
   if (!token) {

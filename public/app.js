@@ -1,5 +1,8 @@
+document.title = 'Numbafox Classroom';
 let localPreview = false, isTeacher = false;
 const $=s=>document.querySelector(s);let state=null,tab='messages',token='',answeredPoll=null;
+const boardBrand = document.querySelector('.lesson .eyebrow');
+if (boardBrand) boardBrand.firstChild.textContent = 'NUMBAFOX CLASSROOM ';
 const clientId=crypto.randomUUID(), votedQuestions=new Set();
 async function api(endpoint,data,teacher=false){
  const options={method:'POST',headers:{'Content-Type':'application/json',...(teacher?{'X-Admin-Token':token}:{})},body:JSON.stringify(data)};
@@ -66,7 +69,7 @@ $('#teacher-toggle').onclick=async()=>{if(activePanel==='teacher'||!state)return
 $('#lesson-form').onsubmit=async e=>{e.preventDefault();try{await api('update',{title:$('#edit-title').value,board:{title:'The Board',layout:$('#board-layout').value,rows:$('#rows').value.split('\n').filter(x=>x.trim()).map((text,index,rows)=>({text,kind:index===rows.length-1?'answer':'active'})),angles:[]},stage:$('#stage-board').checked,working:$('#edit-working').value,explanation:$('#edit-explanation').value},true);$('#teacher-note').textContent='Lesson updated.'}catch(err){$('#teacher-note').textContent=err.message}};
 $('#go-live').onclick=()=>api('update',{status:'live'},true);$('#end-class').onclick=()=>api('update',{status:'ended'},true);
 $('#start-lesson').onsubmit=async event=>{event.preventDefault();try{await api('lesson',{topic:$('#lesson-topic').value,grade:$('#lesson-grade').value,exam:$('#lesson-exam').value,introduction:$('#lesson-intro').value,question:$('#lesson-question').value},true);$('#teacher-note').textContent='Lesson started. The AI is preparing the first step…';await teachAI()}catch(error){$('#teacher-note').textContent=error.message}};
-function addAiMessage(role,text){const feed=$('#teacher-ai-feed');if(!feed)return;const message=el('div','','teacher-ai-message '+role);message.append(el('small',role==='teacher'?'You':'MathFox AI'),el('div',text));feed.append(message);feed.scrollTop=feed.scrollHeight}
+function addAiMessage(role,text){const feed=$('#teacher-ai-feed');if(!feed)return;const message=el('div','','teacher-ai-message '+role);message.append(el('small',role==='teacher'?'You':'Numbafox AI'),el('div',text));feed.append(message);feed.scrollTop=feed.scrollHeight}
 async function teachAI(instruction='',image=null){const buttons=[$('#generate'),$('#ask-ai')];buttons.forEach(b=>b.disabled=true);if(instruction)addAiMessage('teacher',instruction);else addAiMessage('teacher','Continue with the next teaching step.');$('#teacher-note').textContent='AI is preparing the next board update…';try{await api('ai',{instruction,image},true);addAiMessage('ai','I have prepared the next step and sent it to the board.');$('#teacher-note').textContent='Board updated.'}catch(error){$('#teacher-note').textContent=error.message;addAiMessage('ai','I could not update the board: '+error.message);throw error}finally{buttons.forEach(b=>b.disabled=false)}}
 $('#generate').onclick=()=>teachAI().catch(()=>{});let teacherImage=null;
 function clearTeacherImage(){teacherImage=null;$('#teacher-image-file').value='';$('#teacher-image').removeAttribute('src');$('#teacher-image-preview').hidden=true}

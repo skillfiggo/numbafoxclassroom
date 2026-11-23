@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 
 const emptyRoom = () => ({
-  title: 'Welcome to maths class', status: 'waiting',
+  title: 'Welcome to Numbafox classroom', status: 'waiting',
   board: { title: 'The Board', layout: 'working', rows: [], angles: [] },
   explanation: 'Your lesson will appear here.', working: 'Your written explanation will appear here.',
   messages: [], questions: [], hands: [], poll: null, recap: [],
@@ -95,6 +95,10 @@ export class ClassroomRoom extends DurableObject {
     if (event.type === 'state' && event.room && typeof event.room === 'object') {
       if (!actor.teacher) throw new Error('Only teachers can update the board.');
       this.room = event.room;
+    }
+    if (event.type === 'lesson' && event.lesson) {
+      if (!actor.teacher) throw new Error('Only teachers can create classes.');
+      this.room = { ...emptyRoom(), title: event.lesson.topic, status: 'live', lesson: event.lesson };
     }
     if (event.type === 'message' && event.message) this.room.messages = [...this.room.messages, event.message].slice(-100);
     if (event.type === 'question' && event.question) this.room.questions = [...this.room.questions, event.question].slice(-100);

@@ -1,6 +1,6 @@
 import { ClassroomRoom } from './classroom-room.mjs';
 import { authenticatedUser } from './supabase.mjs';
-import { accountApi } from './account-api.mjs';
+import { accountApi, accountFromCookies } from './account-api.mjs';
 
 export { ClassroomRoom };
 
@@ -21,6 +21,39 @@ export default {
     }
     if (request.method === 'GET' && url.pathname === '/api/state') {
       return publicRoom.fetch(new Request(new URL('/state', request.url)));
+    }
+    if (request.method === 'GET' && url.pathname === '/api/classes') {
+      const room = await publicRoom.fetch(new Request(new URL('/state', request.url))).then(response => response.json());
+      const lesson = room.lesson || {};
+      return Response.json(room.status === 'live' && lesson.topic ? [{
+        title: lesson.topic, description: lesson.introduction || '', grade: lesson.grade || 'All levels', exam: lesson.exam || 'All goals'
+      }] : []);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/lesson') {
+      const current = await accountFromCookies(request, env).catch(() => null);
+      if (!current) return Response.json({ error: 'Sign in to create a class.' }, { status: 401 });
+      if (!current.account.teacher) return Response.json({ error: 'Only teachers can create classes.' }, { status: 403 });
+      const lesson = await request.json().catch(() => null);
+      if (!lesson?.topic || String(lesson.topic).trim().length > 200) {
+        return Response.json({ error: 'Enter a class topic.' }, { status: 400 });
+      }
+      return publicRoom.fetch(new Request(new URL('/state', request.url), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Classroom-User': current.account.user.id,
+          'X-Classroom-Teacher': 'true'
+        },
+        body: JSON.stringify({ type: 'lesson', lesson: {
+          id: crypto.randomUUID(), topic: String(lesson.topic).trim(),
+          introduction: String(lesson.introduction || '').trim().slice(0, 1200),
+          question: String(lesson.question || '').trim().slice(0, 800),
+          teacherGuidance: String(lesson.teacherGuidance || '').trim().slice(0, 1200),
+          grade: String(lesson.grade || 'All levels').slice(0, 30),
+          exam: String(lesson.exam || 'All goals').slice(0, 30),
+          speaker: 'ai', step: 0, paused: false
+        } })
+      }));
     }
     if (request.method === 'POST' && url.pathname === '/api/presence') {
       return publicRoom.fetch(new Request(new URL('/presence', request.url), {

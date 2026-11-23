@@ -12,7 +12,7 @@ export default defineConfig({
     },
     assets: {
       notFoundHandling: "single-page-application",
-      runWorkerFirst: ["/api/*", "/room/*"]
+      runWorkerFirst: ["/api/*", "/events", "/room/*"]
     },
     env: {
       ASSETS: bindings.assets(),
