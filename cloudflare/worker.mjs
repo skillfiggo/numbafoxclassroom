@@ -6,6 +6,38 @@ export { ClassroomRoom };
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const publicRoom = env.CLASSROOM_ROOM.getByName('public-classroom');
+    if (request.method === 'GET' && url.pathname === '/api/classroom-mode') {
+      return Response.json({ localPreview: false });
+    }
+    if (request.method === 'GET' && url.pathname === '/events') {
+      const headers = new Headers(request.headers);
+      headers.set('X-Classroom-Client', url.searchParams.get('id') || crypto.randomUUID());
+      return publicRoom.fetch(new Request(new URL('/events', request.url), { headers }));
+    }
+    if (request.method === 'GET' && url.pathname === '/api/state') {
+      return publicRoom.fetch(new Request(new URL('/state', request.url)));
+    }
+    if (request.method === 'POST' && url.pathname === '/api/presence') {
+      return Response.json({ ok: true });
+    }
+    if (request.method === 'POST' && (url.pathname === '/api/message' || url.pathname === '/api/question')) {
+      const body = await request.json();
+      const type = url.pathname.endsWith('/message') ? 'message' : 'question';
+      const item = {
+        id: crypto.randomUUID(),
+        name: String(body.name || 'Guest').slice(0, 30),
+        text: String(body.text || '').slice(0, 1000),
+        at: Date.now(),
+        votes: 0
+      };
+      if (!item.text.trim()) return Response.json({ error: 'Write a message first.' }, { status: 400 });
+      return publicRoom.fetch(new Request(new URL('/state', request.url), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Classroom-User': `guest:${crypto.randomUUID()}` },
+        body: JSON.stringify({ type, [type]: item })
+      }));
+    }
     if (url.pathname.startsWith('/room/')) {
       const [, , roomId, action = 'state'] = url.pathname.split('/');
       if (!roomId) return new Response('Room ID required', { status: 400 });

@@ -14,6 +14,7 @@ export class ClassroomRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.room = emptyRoom();
+    this.eventStreams = new Map();
     ctx.blockConcurrencyWhile(async () => {
       this.room = (await ctx.storage.get('room')) || emptyRoom();
     });
@@ -21,6 +22,7 @@ export class ClassroomRoom extends DurableObject {
 
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname.endsWith('/events')) return this.events(request);
     if (url.pathname.endsWith('/connect')) return this.connect(request);
     if (request.method === 'GET') return Response.json(this.publicRoom());
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -28,6 +30,32 @@ export class ClassroomRoom extends DurableObject {
     if (!event?.type) return Response.json({ error: 'Invalid room event.' }, { status: 400 });
     await this.apply(event, this.identity(request));
     return Response.json({ ok: true, room: this.publicRoom() });
+  }
+
+  events(request) {
+    const id = request.headers.get('X-Classroom-Client') || crypto.randomUUID();
+    const name = request.headers.get('X-Classroom-Name') || 'Guest';
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const client = { id, name, writer };
+    this.eventStreams.set(id, client);
+    this.sendEvent(client, 'state', this.publicRoom());
+    this.publishPresence();
+
+    const close = () => {
+      if (this.eventStreams.get(id) !== client) return;
+      this.eventStreams.delete(id);
+      writer.close().catch(() => {});
+      this.publishPresence();
+    };
+    request.signal.addEventListener('abort', close, { once: true });
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive'
+      }
+    });
   }
 
   async connect(request) {
@@ -61,6 +89,7 @@ export class ClassroomRoom extends DurableObject {
     if (event.type === 'question' && event.question) this.room.questions = [...this.room.questions, event.question].slice(-100);
     await this.ctx.storage.put('room', this.room);
     this.broadcast({ type: 'state', room: this.publicRoom() });
+    this.publishState();
   }
 
   publicRoom() {
@@ -72,5 +101,20 @@ export class ClassroomRoom extends DurableObject {
   broadcast(event) {
     const message = JSON.stringify(event);
     for (const socket of this.ctx.getWebSockets()) socket.send(message);
+  }
+
+  sendEvent(client, event, data) {
+    client.writer.write(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)).catch(() => {
+      if (this.eventStreams.get(client.id) === client) this.eventStreams.delete(client.id);
+    });
+  }
+
+  publishState() {
+    for (const client of this.eventStreams.values()) this.sendEvent(client, 'state', this.publicRoom());
+  }
+
+  publishPresence() {
+    const people = [...this.eventStreams.values()].map(({ id, name }) => ({ id, name }));
+    for (const client of this.eventStreams.values()) this.sendEvent(client, 'presence', people);
   }
 }

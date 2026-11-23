@@ -142,7 +142,13 @@ async function connectClassroom() {
       else joinDialog.showModal();
     } else {
       const response = await fetch('/api/account');
-      if (response.status === 401) return location.assign('/learn');
+      // The public Worker board permits a guest view. Authenticated classroom
+      // sessions still load their profile once the full account API is present.
+      if (response.status === 401) {
+        if (savedName) $('#name').value = savedName;
+        else joinDialog.showModal();
+        return;
+      }
       if (!response.ok) throw Error('Account unavailable');
       const account = await response.json();
       if (!account.profile) return location.assign('/learn');
