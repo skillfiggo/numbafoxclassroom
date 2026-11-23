@@ -24,7 +24,7 @@ function boardFrom(show, lesson) {
   return {
     action: lesson.step ? 'update' : 'new', problem: lesson.question || lesson.topic,
     title: lesson.topic || 'Live lesson', topic: 'algebra', layout: 'equations', columns: 1,
-    rows, diagram: { shape: 'none', labels: [], gridColumns: 0, gridRows: 0, showGrid: false },
+    rows, diagram: { shape: 'none', scene: null, labels: [], gridColumns: 0, gridRows: 0, showGrid: false },
     caption: '', question: '', complete: false
   };
 }
