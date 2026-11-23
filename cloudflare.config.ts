@@ -5,6 +5,11 @@ export default defineConfig({
     name: "jambandwaec-classroom",
     compatibilityDate: "2026-11-22",
     entrypoint: "./cloudflare/worker.mjs",
+    previewUrls: false,
+    observability: {
+      enabled: true,
+      logs: { enabled: true, invocationLogs: true, persist: true }
+    },
     assets: {
       notFoundHandling: "single-page-application",
       runWorkerFirst: ["/api/*", "/room/*"]
