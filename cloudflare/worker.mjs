@@ -1,5 +1,6 @@
 import { ClassroomRoom } from './classroom-room.mjs';
 import { authenticatedUser } from './supabase.mjs';
+import { accountApi } from './account-api.mjs';
 
 export { ClassroomRoom };
 
@@ -7,6 +8,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const publicRoom = env.CLASSROOM_ROOM.getByName('public-classroom');
+    if (url.pathname === '/api/account' || url.pathname.startsWith('/api/account/')) {
+      return accountApi(request, env, url.pathname);
+    }
     if (request.method === 'GET' && url.pathname === '/api/classroom-mode') {
       return Response.json({ localPreview: false });
     }
@@ -59,6 +63,9 @@ export default {
         redirect: request.redirect
       });
       return env.CLASSROOM_ROOM.getByName(roomId).fetch(roomRequest);
+    }
+    if (url.pathname.startsWith('/api/')) {
+      return Response.json({ error: 'This classroom endpoint is not available yet.' }, { status: 404 });
     }
     return env.ASSETS.fetch(request);
   }
