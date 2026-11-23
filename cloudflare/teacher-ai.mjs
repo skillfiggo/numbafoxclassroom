@@ -56,6 +56,26 @@ function cleanBoard(raw, previous, lesson) {
   return { ...raw, action: previous?.rows?.length ? 'update' : 'new', rows, diagram: { ...diagram, labels, scene: null } };
 }
 
+function fallbackBoard(show, lesson, previous) {
+  const lines = show.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 8);
+  const trig = /trigon|right.?angled|hypotenuse|\\?theta|\\?cos|\\?sin|\\?tan/i.test(`${lesson.topic} ${lesson.question} ${show}`);
+  const values = `${lesson.question} ${show}`.match(/\d+(?:\.\d+)?\s*(?:cm|m|mm)?/g) || [];
+  return {
+    action: previous?.rows?.length ? 'update' : 'new', problem: lesson.question || lesson.topic,
+    title: lesson.topic || 'Live lesson', topic: trig ? 'geometry' : 'general', layout: 'equations', columns: 1,
+    rows: (lines.length ? lines : ['Let’s start with the given information.']).map((line, index) => ({
+      id: `step-${index + 1}`, heading: index === 0 ? 'Step 1: Read the diagram' : '', explanation: '',
+      result: false, rule: false, cells: [{ text: line.slice(0, 160), tone: 'given', previous: '' }]
+    })),
+    diagram: trig ? { shape: 'triangle', scene: null, labels: [
+      { position: 'top', text: 'θ', tone: 'given' },
+      { position: 'left', text: values[0] || 'opposite', tone: 'given' },
+      { position: 'right', text: values[1] || 'hypotenuse', tone: 'note' }
+    ], gridColumns: 0, gridRows: 0, showGrid: false } : { shape: 'none', scene: null, labels: [], gridColumns: 0, gridRows: 0, showGrid: false },
+    caption: '', question: '', complete: false
+  };
+}
+
 export async function createTeachingStep(env, room, instruction) {
   if (!env.OPENAI_API_KEY) return { error: 'AI is not configured yet.', status: 503 };
   const lesson = room.lesson || {};
@@ -81,8 +101,8 @@ export async function createTeachingStep(env, room, instruction) {
     const answer = JSON.parse(outputText(await response.json()));
     const show = String(answer.show || '').trim().slice(0, 6000);
     const say = String(answer.say || '').trim().slice(0, 5000);
-    const board = cleanBoard(answer.board, room.board, lesson);
-    if (!show || !say || !board) throw new Error('invalid AI response');
+    if (!show || !say) throw new Error('invalid AI response');
+    const board = cleanBoard(answer.board, room.board, lesson) || fallbackBoard(show, lesson, room.board);
     return { update: { board, working: show, explanation: say } };
   } catch { return { error: 'AI could not prepare a valid visual step. Please try again.', status: 502 }; }
 }
