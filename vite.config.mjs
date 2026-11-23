@@ -3,21 +3,6 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   publicDir: "public",
-  plugins: [
-    cloudflare({
-      viteEnvironment: { name: "worker" },
-      // The current Vite plugin calls this customizer with its generated
-      // Worker config. Returning our config keeps the same setup locally
-      // and in Cloudflare Workers Builds.
-      config: () => ({
-        name: "jambandwaec-classroom",
-        main: "./cloudflare/worker.mjs",
-        compatibility_date: "2026-11-22",
-        assets: { binding: "ASSETS", run_worker_first: ["/api/*", "/room/*"] },
-        durable_objects: { bindings: [{ name: "CLASSROOM_ROOM", class_name: "ClassroomRoom" }] },
-        migrations: [{ tag: "v1", new_sqlite_classes: ["ClassroomRoom"] }]
-      })
-    })
-  ],
+  plugins: [cloudflare({ viteEnvironment: { name: "worker" } })],
   environments: { worker: { build: { sourcemap: true } } }
 });
