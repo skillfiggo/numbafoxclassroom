@@ -19,7 +19,11 @@ export default {
       return publicRoom.fetch(new Request(new URL('/state', request.url)));
     }
     if (request.method === 'POST' && url.pathname === '/api/presence') {
-      return Response.json({ ok: true });
+      return publicRoom.fetch(new Request(new URL('/presence', request.url), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: request.body
+      }));
     }
     if (request.method === 'POST' && (url.pathname === '/api/message' || url.pathname === '/api/question')) {
       const body = await request.json();

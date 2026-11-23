@@ -23,6 +23,7 @@ export class ClassroomRoom extends DurableObject {
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname.endsWith('/events')) return this.events(request);
+    if (url.pathname.endsWith('/presence') && request.method === 'POST') return this.presence(request);
     if (url.pathname.endsWith('/connect')) return this.connect(request);
     if (request.method === 'GET') return Response.json(this.publicRoom());
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -56,6 +57,16 @@ export class ClassroomRoom extends DurableObject {
         Connection: 'keep-alive'
       }
     });
+  }
+
+  async presence(request) {
+    const { id, name } = await request.json();
+    const client = this.eventStreams.get(String(id || ''));
+    if (client) {
+      client.name = String(name || 'Guest').trim().slice(0, 30) || 'Guest';
+      this.publishPresence();
+    }
+    return Response.json({ ok: true });
   }
 
   async connect(request) {
