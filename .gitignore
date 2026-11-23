@@ -1,4 +1,8 @@
 .env
+.pnpm-store/
+node_modules/
+.cloudflare/
+dist/
 .env.*
 !.env.example
 node_modules/
