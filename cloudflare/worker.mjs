@@ -1,6 +1,7 @@
 import { ClassroomRoom } from './classroom-room.mjs';
 import { authenticatedUser } from './supabase.mjs';
 import { accountApi, accountFromCookies } from './account-api.mjs';
+import { createTeachingStep } from './teacher-ai.mjs';
 
 export { ClassroomRoom };
 
@@ -53,6 +54,20 @@ export default {
           exam: String(lesson.exam || 'All goals').slice(0, 30),
           speaker: 'ai', step: 0, paused: false
         } })
+      }));
+    }
+    if (request.method === 'POST' && url.pathname === '/api/ai') {
+      const current = await accountFromCookies(request, env).catch(() => null);
+      if (!current) return Response.json({ error: 'Sign in to guide the AI.' }, { status: 401 });
+      if (!current.account.teacher) return Response.json({ error: 'Only teachers can guide the AI.' }, { status: 403 });
+      const body = await request.json().catch(() => ({}));
+      const room = await publicRoom.fetch(new Request(new URL('/state', request.url))).then(response => response.json());
+      const result = await createTeachingStep(env, room, String(body.instruction || '').trim().slice(0, 800));
+      if (result.error) return Response.json({ error: result.error }, { status: result.status });
+      return publicRoom.fetch(new Request(new URL('/state', request.url), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Classroom-User': current.account.user.id, 'X-Classroom-Teacher': 'true' },
+        body: JSON.stringify({ type: 'ai', update: result.update })
       }));
     }
     if (request.method === 'POST' && url.pathname === '/api/presence') {

@@ -100,6 +100,16 @@ export class ClassroomRoom extends DurableObject {
       if (!actor.teacher) throw new Error('Only teachers can create classes.');
       this.room = { ...emptyRoom(), title: event.lesson.topic, status: 'live', lesson: event.lesson };
     }
+    if (event.type === 'ai' && event.update) {
+      if (!actor.teacher) throw new Error('Only teachers can guide the AI.');
+      this.room = {
+        ...this.room,
+        board: event.update.board,
+        working: event.update.working,
+        explanation: event.update.explanation,
+        lesson: { ...this.room.lesson, step: (this.room.lesson?.step || 0) + 1, speaker: 'ai' }
+      };
+    }
     if (event.type === 'message' && event.message) this.room.messages = [...this.room.messages, event.message].slice(-100);
     if (event.type === 'question' && event.question) this.room.questions = [...this.room.questions, event.question].slice(-100);
     await this.ctx.storage.put('room', this.room);
