@@ -84,7 +84,7 @@ function renderCheck(){const root=$('#check-content');root.replaceChildren();con
 function renderRecap(){const root=$('#recap-content');root.replaceChildren();const entries=state.recap||[];if(!entries.length){root.append(el('p','The lesson recap will appear here as the class progresses.','note'));return}entries.forEach((entry,index)=>{const block=document.createElement('details');block.className='recap-entry';const summary=el('summary','Step '+(index+1));block.append(summary);if(entry.working)block.append(el('p',entry.working,'recap-text'));else if(entry.board?.rows?.length)block.append(el('p',entry.board.rows.map(row=>row.text??row.cells?.map(c=>c.text).join(' ')??'').join('\n'),'recap-text'));if(entry.explanation){const spoken=el('p',entry.explanation,'recap-spoken');block.append(spoken)}root.append(block)})}
 $('#pause-lesson').onclick=()=>api('lesson-control',{paused:!state.lesson.paused},true).catch(e=>$('#teacher-note').textContent=e.message);
 // Local WebRTC audio: viewers opt in before the teacher's microphone connects.
-let microphoneStream=null,audioEnabled=false,listenerPeer=null,voiceRequested=false,lastNarratedStep=0;
+let microphoneStream=null,audioEnabled=true,listenerPeer=null,voiceRequested=false,lastNarratedStep=0;
 const teacherPeers=new Map(), earlyIce=new Map();
 function closePeer(peer){if(peer){peer.onicecandidate=null;peer.ontrack=null;peer.close()}}
 function resetVoicePeers(){for(const peer of teacherPeers.values())closePeer(peer);teacherPeers.clear();earlyIce.clear();closePeer(listenerPeer);listenerPeer=null;voiceRequested=false;$('#teacher-audio').srcObject=null}
