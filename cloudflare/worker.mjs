@@ -27,8 +27,25 @@ export default {
       const room = await publicRoom.fetch(new Request(new URL('/state', request.url))).then(response => response.json());
       const lesson = room.lesson || {};
       return Response.json(room.status === 'live' && lesson.topic ? [{
-        title: lesson.topic, description: lesson.introduction || '', grade: lesson.grade || 'All levels', exam: lesson.exam || 'All goals'
+        id: lesson.id, title: lesson.topic, description: lesson.introduction || '', grade: lesson.grade || 'All levels', exam: lesson.exam || 'All goals'
       }] : []);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/class/join') {
+      const current = await accountFromCookies(request, env).catch(() => null);
+      if (!current) return Response.json({ error: 'Sign in to join a class.' }, { status: 401 });
+      const room = await publicRoom.fetch(new Request(new URL('/state', request.url))).then(response => response.json());
+      if (room.status !== 'live') return Response.json({ error: 'This class is no longer live.' }, { status: 409 });
+      return publicRoom.fetch(new Request(new URL('/state', request.url), {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Classroom-User': current.account.user.id, 'X-Classroom-Teacher': String(current.account.teacher) },
+        body: JSON.stringify({ type: 'join' })
+      }));
+    }
+    if (request.method === 'GET' && url.pathname === '/api/class/access') {
+      const current = await accountFromCookies(request, env).catch(() => null);
+      if (!current) return Response.json({ error: 'Sign in to enter the classroom.' }, { status: 401 });
+      return publicRoom.fetch(new Request(new URL('/membership', request.url), {
+        headers: { 'X-Classroom-User': current.account.user.id, 'X-Classroom-Teacher': String(current.account.teacher) }
+      }));
     }
     if (request.method === 'POST' && url.pathname === '/api/lesson') {
       const current = await accountFromCookies(request, env).catch(() => null);
@@ -89,8 +106,9 @@ export default {
       }));
     }
     if (request.method === 'POST' && url.pathname === '/api/leave') {
+      const current = await accountFromCookies(request, env).catch(() => null);
       return publicRoom.fetch(new Request(new URL('/leave', request.url), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: request.body
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...(current ? { 'X-Classroom-User': current.account.user.id } : {}) }, body: request.body
       }));
     }
     if (request.method === 'POST' && (url.pathname === '/api/message' || url.pathname === '/api/question')) {

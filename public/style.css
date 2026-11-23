@@ -325,7 +325,7 @@ select{width:100%;border:1px solid #d7e0eb;border-radius:9px;padding:11px 12px;c
 .teacher-icon-button:hover{background:#dfeaf8;color:#205faf}
 .teacher-icon-button.primary{background:#1467df;color:#fff}
 .teacher-icon-button:disabled{opacity:.5;cursor:wait}
-.teacher-composer{display:flex;align-items:flex-end;gap:5px;margin-top:12px;padding:4px 4px 4px 5px;border:1px solid #dce5ef;border-radius:22px;background:#f7f9fc}
+.teacher-composer{display:flex;align-items:flex-end;gap:5px;position:sticky;bottom:0;z-index:3;margin-top:12px;padding:4px 4px 4px 5px;border:1px solid #dce5ef;border-radius:22px;background:#f7f9fc;box-shadow:0 -10px 18px #f7f9fccc}
 .teacher-composer textarea{flex:1;min-width:0;min-height:38px;max-height:110px;border:0;outline:0;margin:0;padding:9px 0 7px;background:transparent;resize:none;line-height:1.4;font-size:.9rem}
 .teacher-composer .attach-button{background:transparent}
 .teacher-image-preview{position:relative;width:75px;margin-top:10px}

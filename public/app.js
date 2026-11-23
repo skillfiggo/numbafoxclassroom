@@ -72,7 +72,7 @@ $('#start-lesson').onsubmit=async event=>{event.preventDefault();try{await api('
 function addAiMessage(role,text){const feed=$('#teacher-ai-feed');if(!feed)return;const message=el('div','','teacher-ai-message '+role);message.append(el('small',role==='teacher'?'You':'Numbafox AI'),el('div',text));feed.append(message);feed.scrollTop=feed.scrollHeight}
 let roomSnapshotKey='';
 async function applyRoomSnapshot(snapshot){if(!snapshot||typeof snapshot!=='object')return;const key=JSON.stringify(snapshot);if(key===roomSnapshotKey)return;roomSnapshotKey=key;const prior=state;state=snapshot;render();if(state.lesson?.step>(prior?.lesson?.step||0)&&!state.lesson?.paused&&!state.voice?.active)playNarration(state.explanation)}
-async function teachAI(instruction='',image=null){const buttons=[$('#generate'),$('#ask-ai')];buttons.forEach(b=>b.disabled=true);if(instruction)addAiMessage('teacher',instruction);else addAiMessage('teacher','Continue with the next teaching step.');$('#teacher-note').textContent='AI is preparing the next board update…';try{const result=await api('ai',{instruction,image},true);await applyRoomSnapshot(result.room);addAiMessage('ai','I have prepared the next step and sent it to the board.');$('#teacher-note').textContent='Board updated.'}catch(error){$('#teacher-note').textContent=error.message;addAiMessage('ai','I could not update the board: '+error.message);throw error}finally{buttons.forEach(b=>b.disabled=false)}}
+async function teachAI(instruction='',image=null){const buttons=[$('#generate'),$('#ask-ai')];buttons.forEach(b=>b.disabled=true);if(instruction)addAiMessage('teacher',instruction);else addAiMessage('teacher','Continue with the next teaching step.');$('#teacher-note').textContent='AI is preparing the next board update…';try{const result=await api('ai',{instruction,image},true);await applyRoomSnapshot(result.room);addAiMessage('ai',result.room?.working||'The next visual step is on the board.');$('#teacher-note').textContent='Board updated. The spoken explanation is playing for the class.'}catch(error){$('#teacher-note').textContent=error.message;addAiMessage('ai','I could not update the board: '+error.message);throw error}finally{buttons.forEach(b=>b.disabled=false)}}
 $('#generate').onclick=()=>teachAI().catch(()=>{});let teacherImage=null;
 function clearTeacherImage(){teacherImage=null;$('#teacher-image-file').value='';$('#teacher-image').removeAttribute('src');$('#teacher-image-preview').hidden=true}
 $('#remove-teacher-image').onclick=clearTeacherImage;$('#attach-teacher-image').onclick=()=>$('#teacher-image-file').click();
@@ -110,9 +110,10 @@ function participantInitial(name){return name==='Guest'?'•':Array.from(name.tr
 const leaveClassButton=document.createElement('button');
 leaveClassButton.id='leave-class';leaveClassButton.type='button';leaveClassButton.className='leave-class';leaveClassButton.textContent='Leave class';
 leaveClassButton.onclick=async()=>{
+  if(isTeacher&&!confirm('Leave this class? It will stay live for students until you end it.'))return;
   leaveClassButton.disabled=true;
-  try{await fetch('/api/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:clientId})})}catch{}
-  events.close();clearInterval(roomSyncTimer);location.assign('/learn');
+  try{await fetch('/api/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:clientId}),keepalive:true})}catch{}
+  events?.close();clearInterval(roomSyncTimer);location.assign('/learn');
 };
 document.querySelector('.activity-island')?.append(leaveClassButton);
 function renderPresence(people){const stack=$('#avatar-stack'),list=$('#participants-list');stack.replaceChildren();list.replaceChildren();people.slice(0,4).forEach(person=>{const avatar=el('span',participantInitial(person.name),'avatar');avatar.title=person.name;avatar.setAttribute('aria-label',person.name);stack.append(avatar)});if(people.length>4)stack.append(el('span','+'+(people.length-4),'avatar avatar-more'));$('#presence-count').textContent=people.length===1?'1 here':people.length+' here';$('#participants-summary').textContent=people.length===1?'1 person online':people.length+' people online';if(!people.length)list.append(el('li','No one is connected yet.','participants-empty'));people.forEach(person=>{const item=el('li','','participant');const avatar=el('span',participantInitial(person.name),'participant-avatar');avatar.setAttribute('aria-hidden','true');const details=el('span','','participant-details');details.append(el('strong',person.name+(person.id===clientId?' (you)':'')),el('small','Online'));item.append(avatar,details);list.append(item)})}
@@ -165,6 +166,8 @@ async function connectClassroom() {
       if (!response.ok) throw Error('Account unavailable');
       const account = await response.json();
       if (!account.profile) return location.assign('/learn');
+      const access = await fetch('/api/class/access', { cache: 'no-store' });
+      if (!access.ok || !(await access.json()).joined) return location.assign('/learn');
       $('#name').value = account.profile.name;
       $('#name').readOnly = true;
       if (account.teacher) enableTeacherWorkspace();
@@ -283,7 +286,7 @@ function enableTeacherWorkspace() {
   if (attachment && !attachment.dataset.friendlyLabel) {
     attachment.dataset.friendlyLabel = 'true';
     attachment.classList.add('teacher-attachment');
-    attachment.innerHTML = '<i class="fa-solid fa-paperclip" aria-hidden="true"></i><span>Attach image</span>';
+    attachment.innerHTML = '<i class="fa-solid fa-paperclip" aria-hidden="true"></i>';
   }
   tab = 'messages';
   render();

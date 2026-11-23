@@ -333,8 +333,13 @@ function classCard(item) {
   if (item.description) card.append(create('p', item.description));
   const meta = create('div', undefined, 'class-meta');
   for (const label of [item.grade || 'All levels', item.exam || 'All goals']) meta.append(create('span', label));
-  const link = create('a', 'Join class', 'class-link');
-  link.href = '/classroom';
+  const link = create('button', 'Join class', 'class-link');
+  link.type = 'button';
+  link.onclick = async () => {
+    link.disabled = true;
+    try { await request('class/join', { id: item.id }); location.assign('/classroom'); }
+    catch (error) { link.disabled = false; alert(error.message); }
+  };
   card.append(meta, link);
   return card;
 }

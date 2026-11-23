@@ -26,10 +26,18 @@ function boardFrom(answer, lesson, previous) {
     explanation: answer.explanation.slice(0, 240), rule: false, result: answer.complete,
     cells: [{ text: answer.equation.slice(0, 160), tone: answer.complete ? 'answer' : 'given', previous: '' }]
   }];
+  const trigonometry = /trigon|sine|cosine|tangent|\bsin\b|\bcos\b|\btan\b/i.test(`${lesson.topic} ${lesson.question} ${answer.equation}`);
+  const diagram = trigonometry
+    ? { shape: 'triangle', scene: null, labels: [
+      { position: 'top', text: 'θ', tone: 'given' },
+      { position: 'left', text: 'opposite', tone: 'note' },
+      { position: 'right', text: 'hypotenuse', tone: 'given' }
+    ], gridColumns: 0, gridRows: 0, showGrid: false }
+    : { shape: 'none', scene: null, labels: [], gridColumns: 0, gridRows: 0, showGrid: false };
   return {
     action: oldRows.length ? 'update' : 'new', problem: lesson.question || lesson.topic,
     title: lesson.topic || 'Live lesson', topic: 'algebra', layout: 'equations', columns: 1,
-    rows, diagram: { shape: 'none', scene: null, labels: [], gridColumns: 0, gridRows: 0, showGrid: false },
+    rows, diagram,
     caption: answer.explanation.slice(0, 350), question: answer.question.slice(0, 500), complete: answer.complete
   };
 }

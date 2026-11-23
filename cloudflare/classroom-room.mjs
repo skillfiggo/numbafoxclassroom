@@ -4,7 +4,7 @@ const emptyRoom = () => ({
   title: 'Welcome to Numbafox classroom', status: 'waiting',
   board: { title: 'The Board', layout: 'working', rows: [], angles: [] },
   explanation: 'Your lesson will appear here.', working: 'Your written explanation will appear here.',
-  messages: [], questions: [], hands: [], poll: null, recap: [],
+  messages: [], questions: [], hands: [], poll: null, recap: [], members: [],
   reveal: { visible: 0, total: 0 },
   lesson: { topic: '', introduction: '', question: '', speaker: 'ai', step: 0, paused: false },
   voice: { active: false, teacherId: null }
@@ -33,6 +33,7 @@ export class ClassroomRoom extends DurableObject {
     if (url.pathname.endsWith('/events')) return this.events(request);
     if (url.pathname.endsWith('/presence') && request.method === 'POST') return this.presence(request);
     if (url.pathname.endsWith('/leave') && request.method === 'POST') return this.leave(request);
+    if (url.pathname.endsWith('/membership')) return this.membership(request);
     if (url.pathname.endsWith('/connect')) return this.connect(request);
     if (request.method === 'GET') return Response.json(this.publicRoom());
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -86,7 +87,17 @@ export class ClassroomRoom extends DurableObject {
       client.writer.close().catch(() => {});
       this.publishPresence();
     }
+    const userId = request.headers.get('X-Classroom-User');
+    if (userId) {
+      this.room.members = (this.room.members || []).filter(member => member !== userId);
+      await this.ctx.storage.put('room', this.room);
+    }
     return Response.json({ ok: true });
+  }
+
+  membership(request) {
+    const actor = this.identity(request);
+    return Response.json({ joined: actor.teacher || (this.room.members || []).includes(actor.userId) });
   }
 
   async connect(request) {
@@ -119,6 +130,9 @@ export class ClassroomRoom extends DurableObject {
     if (event.type === 'lesson' && event.lesson) {
       if (!actor.teacher) throw new Error('Only teachers can create classes.');
       this.room = { ...emptyRoom(), title: event.lesson.topic, status: 'live', lesson: event.lesson };
+    }
+    if (event.type === 'join') {
+      this.room.members = [...new Set([...(this.room.members || []), actor.userId])];
     }
     if (event.type === 'ai' && event.update) {
       if (!actor.teacher) throw new Error('Only teachers can guide the AI.');
@@ -159,6 +173,7 @@ export class ClassroomRoom extends DurableObject {
   publicRoom() {
     const room = structuredClone(this.room);
     delete room.lesson?.teacherGuidance;
+    delete room.members;
     return room;
   }
 
